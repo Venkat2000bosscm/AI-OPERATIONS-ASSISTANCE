@@ -1,0 +1,986 @@
+DEVOPS ISSUES & SOLUTIONS — ENTERPRISE KNOWLEDGE BASE
+============================================================
+
+Purpose
+-------
+This document contains realistic sample DevOps Knowledge Base (KB) articles
+for project testing, RAG evaluation, support training, and troubleshooting.
+All hostnames, namespaces, IDs, URLs, and values are SAMPLE data only.
+Do not use sample credentials or commands against production without approval.
+
+KB-DEV-001 — Linux Disk Space Full
+-----------------------------------
+Category: Linux / Infrastructure
+Symptoms:
+- Application cannot write logs or temporary files.
+- "No space left on device" errors.
+- Services may fail to start.
+
+Impact:
+Application outages, failed deployments, and log loss.
+
+Possible Causes:
+1. Large application logs.
+2. Old package/cache files.
+3. Deleted files still held by processes.
+4. Temporary files consuming disk.
+
+Troubleshooting:
+1. Check filesystem usage:
+   df -h
+2. Identify large directories:
+   sudo du -xh /var | sort -h | tail -20
+3. Check log files:
+   sudo du -sh /var/log/*
+4. Check deleted-but-open files:
+   sudo lsof +L1
+5. Review whether log rotation is working.
+
+Solution:
+- Remove approved obsolete files.
+- Configure logrotate.
+- Archive required logs before deletion.
+- Restart a process holding deleted files only after change approval.
+
+Validation:
+df -h
+Confirm filesystem usage is below the operational threshold and application
+writes succeed.
+
+Prevention:
+Configure log rotation, disk alerts, retention policies, and periodic cleanup.
+
+Escalation:
+Escalate if the filesystem remains full after approved cleanup or if a
+database/system partition is affected.
+
+
+KB-DEV-002 — Linux Service Failed to Start
+------------------------------------------
+Category: Linux / Service Management
+Symptoms:
+- systemctl reports failed state.
+- Application is unavailable after reboot.
+
+Troubleshooting:
+1. Check status:
+   systemctl status sample-app
+2. Review recent logs:
+   journalctl -u sample-app --since "30 min ago"
+3. Check configuration and dependencies.
+4. Check ports:
+   ss -lntp
+5. Check filesystem and permissions.
+
+Solution:
+Correct the identified configuration, permission, dependency, or port issue.
+Then:
+   sudo systemctl daemon-reload
+   sudo systemctl restart sample-app
+
+Validation:
+   systemctl is-active sample-app
+   curl -f http://localhost:8080/health
+
+Prevention:
+Use startup health checks, configuration validation, and monitoring.
+
+
+KB-DEV-003 — Git Merge Conflict
+--------------------------------
+Category: Git / Source Control
+Symptoms:
+- Pull or merge reports conflicts.
+- CI pipeline cannot build the branch.
+
+Troubleshooting:
+   git status
+   git diff
+Identify conflicted files and understand both changes before editing.
+
+Solution:
+1. Edit conflicted files.
+2. Remove conflict markers.
+3. Test the code.
+4. Stage resolved files:
+   git add <file>
+5. Continue:
+   git commit
+   or, for rebase:
+   git rebase --continue
+
+Validation:
+   git status
+   git diff HEAD
+Run unit tests and the normal CI checks.
+
+Prevention:
+Keep branches short-lived, sync frequently, and use clear ownership.
+
+
+KB-DEV-004 — Git Push Rejected
+--------------------------------
+Category: Git / Source Control
+Symptoms:
+- "rejected because remote contains work".
+- Push fails after another developer updated the branch.
+
+Solution:
+First inspect the remote:
+   git fetch origin
+   git log --oneline HEAD..origin/main
+
+If appropriate:
+   git pull --rebase origin main
+Resolve conflicts, test, then:
+   git push
+
+Avoid force-pushing shared branches unless explicitly approved.
+
+Validation:
+Confirm the branch is synchronized with the remote and CI starts normally.
+
+
+KB-DEV-005 — Docker Image Build Fails
+-------------------------------------
+Category: Docker / Container
+Symptoms:
+- docker build exits with an error.
+- Dependency installation fails.
+- Dockerfile instruction fails.
+
+Troubleshooting:
+1. Build with full output:
+   docker build --progress=plain -t sample-app:test .
+2. Verify build context.
+3. Check COPY paths.
+4. Validate package versions.
+5. Check base image availability.
+6. Review .dockerignore.
+
+Solution:
+Correct Dockerfile syntax, paths, dependency versions, or base image
+configuration. Rebuild without relying on stale cache when necessary:
+   docker build --no-cache -t sample-app:test .
+
+Validation:
+   docker image inspect sample-app:test
+Run the container and execute its health check.
+
+
+KB-DEV-006 — Docker Container Exits Immediately
+------------------------------------------------
+Category: Docker / Runtime
+Symptoms:
+Container starts and immediately changes to Exited.
+
+Troubleshooting:
+   docker ps -a
+   docker logs <container>
+   docker inspect <container>
+
+Check:
+- ENTRYPOINT/CMD
+- Environment variables
+- Application startup command
+- File permissions
+- Required configuration
+
+Solution:
+Correct the startup command/configuration and rebuild or recreate the
+container.
+
+Validation:
+   docker run --rm -p 8080:8080 sample-app:test
+   curl http://localhost:8080/health
+
+
+KB-DEV-007 — Docker Container Cannot Reach Another Service
+-----------------------------------------------------------
+Category: Docker / Networking
+Symptoms:
+- Connection refused.
+- DNS name cannot be resolved between containers.
+
+Troubleshooting:
+   docker network ls
+   docker network inspect sample-network
+
+Confirm both containers are attached to the same user-defined network.
+Use the service/container name rather than localhost for inter-container
+communication.
+
+Solution:
+Create/use a shared network and configure the application endpoint correctly.
+
+Validation:
+Test DNS resolution and TCP connectivity from the application container.
+
+
+KB-DEV-008 — Kubernetes Pod CrashLoopBackOff
+--------------------------------------------
+Category: Kubernetes / Workload
+Symptoms:
+- Pod repeatedly starts and crashes.
+- kubectl shows CrashLoopBackOff.
+
+Troubleshooting:
+   kubectl get pods -n sample-app
+   kubectl describe pod <pod> -n sample-app
+   kubectl logs <pod> -n sample-app
+   kubectl logs <pod> -n sample-app --previous
+
+Check:
+- Application startup errors
+- Environment variables
+- Secrets/configuration
+- Dependency availability
+- Resource limits
+- Probe configuration
+
+Solution:
+Fix the actual startup problem and redeploy. Do not simply increase
+resources without evidence.
+
+Validation:
+   kubectl rollout status deployment/sample-app -n sample-app
+   kubectl get pods -n sample-app
+
+
+KB-DEV-009 — Kubernetes Pod Pending
+-----------------------------------
+Category: Kubernetes / Scheduling
+Symptoms:
+Pod remains Pending and never starts.
+
+Troubleshooting:
+   kubectl describe pod <pod> -n sample-app
+
+Check Events for:
+- Insufficient CPU/memory
+- Node selector mismatch
+- Taints/tolerations
+- PVC not available
+- Scheduling constraints
+
+Solution:
+Correct resource requests, scheduling rules, node capacity, or storage
+configuration according to the identified cause.
+
+Validation:
+Pod reaches Running/Ready state and deployment becomes available.
+
+
+KB-DEV-010 — Kubernetes ImagePullBackOff
+----------------------------------------
+Category: Kubernetes / Container Registry
+Symptoms:
+- ImagePullBackOff or ErrImagePull.
+- Pod cannot download its container image.
+
+Troubleshooting:
+   kubectl describe pod <pod> -n sample-app
+
+Verify:
+- Image name/tag
+- Registry availability
+- Image existence
+- imagePullSecrets
+- Node network access
+
+Solution:
+Correct image reference or registry authentication. For private registries,
+configure the approved imagePullSecret.
+
+Validation:
+Pod starts successfully and uses the expected image.
+
+
+KB-DEV-011 — Kubernetes Service Not Reachable
+---------------------------------------------
+Category: Kubernetes / Networking
+Symptoms:
+- Application pods are Running.
+- Service returns connection errors or no endpoints.
+
+Troubleshooting:
+   kubectl get svc -n sample-app
+   kubectl get endpoints -n sample-app
+   kubectl get pods --show-labels -n sample-app
+
+Check whether Service selectors match Pod labels.
+
+Solution:
+Correct the Service selector, targetPort, or application listening port.
+
+Validation:
+Test the Service from an appropriate test pod and verify endpoints exist.
+
+
+KB-DEV-012 — Kubernetes Readiness Probe Failure
+-----------------------------------------------
+Category: Kubernetes / Health Checks
+Symptoms:
+Pod is Running but not Ready.
+
+Troubleshooting:
+   kubectl describe pod <pod> -n sample-app
+Review probe events and test the health endpoint manually.
+
+Common causes:
+- Wrong path
+- Wrong port
+- Application startup slower than probe timing
+- Authentication incorrectly required on health endpoint
+
+Solution:
+Correct probe path/port or tune initialDelaySeconds/timeoutSeconds based on
+measured startup behavior.
+
+Validation:
+Pod reports READY 1/1 and Service endpoints include the pod.
+
+
+KB-DEV-013 — Kubernetes ConfigMap/Secret Configuration Issue
+-------------------------------------------------------------
+Category: Kubernetes / Configuration
+Symptoms:
+Application starts with incorrect settings or reports missing environment
+variables.
+
+Troubleshooting:
+   kubectl describe deployment sample-app -n sample-app
+   kubectl get configmap -n sample-app
+   kubectl get secret -n sample-app
+
+Never print secret values into tickets or logs.
+
+Solution:
+Correct the ConfigMap/Secret reference and restart the workload if required.
+
+Validation:
+Application reports expected non-sensitive configuration and passes health
+checks.
+
+
+KB-DEV-014 — Kubernetes Deployment Rollout Stuck
+------------------------------------------------
+Category: Kubernetes / Deployment
+Symptoms:
+Deployment does not complete rollout.
+
+Troubleshooting:
+   kubectl rollout status deployment/sample-app -n sample-app
+   kubectl get rs -n sample-app
+   kubectl describe deployment sample-app -n sample-app
+
+Check for:
+- Failed new pods
+- Insufficient capacity
+- Probe failures
+- Image pull failures
+- Scheduling errors
+
+Solution:
+Fix the root cause. If the release itself is defective and rollback is
+approved:
+   kubectl rollout undo deployment/sample-app -n sample-app
+
+Validation:
+Rollout completes and application health checks pass.
+
+
+KB-DEV-015 — CI Pipeline Fails During Dependency Installation
+--------------------------------------------------------------
+Category: CI/CD / Build
+Symptoms:
+Pipeline fails during npm/pip/maven/gradle package installation.
+
+Troubleshooting:
+1. Identify exact package and error.
+2. Check lockfile consistency.
+3. Check private repository authentication.
+4. Verify runner network access.
+5. Check supported runtime version.
+
+Solution:
+Pin compatible dependency versions, update lockfiles, or correct repository
+configuration. Avoid blindly upgrading all dependencies during incident
+resolution.
+
+Validation:
+Run the same dependency installation in a clean runner.
+
+
+KB-DEV-016 — Azure DevOps Pipeline Agent Offline
+------------------------------------------------
+Category: CI/CD / Azure DevOps
+Symptoms:
+Pipeline is queued but cannot acquire an agent.
+
+Troubleshooting:
+- Check agent pool status.
+- Verify self-hosted agent service.
+- Check machine connectivity.
+- Review agent logs.
+- Check disk and CPU utilization.
+
+Solution:
+Restore the agent service/connectivity or route the job to an approved
+available agent pool.
+
+Validation:
+Run a small test pipeline and confirm the agent completes a job.
+
+
+KB-DEV-017 — GitHub Actions Workflow Fails
+------------------------------------------
+Category: CI/CD / GitHub Actions
+Symptoms:
+Workflow fails in a build, test, or deployment step.
+
+Troubleshooting:
+Review:
+- Failed step
+- Runner OS
+- Action version
+- Environment variables
+- Permissions
+- Artifact availability
+
+Solution:
+Correct the failed step and use explicit action versions where required.
+
+Validation:
+Re-run the workflow and verify all required checks pass.
+
+
+KB-DEV-018 — Jenkins Pipeline Failure
+-------------------------------------
+Category: CI/CD / Jenkins
+Symptoms:
+Build fails on Jenkins but succeeds locally.
+
+Troubleshooting:
+Compare:
+- Java/Python/Node versions
+- Environment variables
+- Workspace contents
+- Credentials binding
+- Agent labels
+- Network access
+
+Solution:
+Make the build environment reproducible and explicitly define required
+runtime versions.
+
+Validation:
+Run the pipeline on a clean agent and confirm consistent results.
+
+
+KB-DEV-019 — Azure Container Registry Image Push Failure
+---------------------------------------------------------
+Category: Azure / Container Registry
+Symptoms:
+docker push fails with authentication or authorization error.
+
+Troubleshooting:
+Verify:
+- Registry name
+- Authentication method
+- Role assignment
+- Repository/tag
+- Network restrictions
+
+Example:
+   az acr login --name SAMPLEACR
+
+Solution:
+Use the organization's approved identity/authentication mechanism and ensure
+the build identity has the required registry permissions.
+
+Validation:
+Confirm the image appears in the intended repository.
+
+
+KB-DEV-020 — AWS ECR Push Failure
+---------------------------------
+Category: AWS / Container Registry
+Symptoms:
+Docker push to ECR fails.
+
+Troubleshooting:
+Check:
+- AWS account/region
+- ECR repository
+- IAM permissions
+- Docker authentication
+- Network connectivity
+
+Example pattern:
+   aws ecr describe-repositories --repository-names sample-app
+Use the organization's approved ECR login method.
+
+Solution:
+Correct repository/region or IAM permissions.
+
+Validation:
+Confirm the image digest/tag is available in ECR.
+
+
+KB-DEV-021 — Application Cannot Connect to Database
+---------------------------------------------------
+Category: Cloud / Database / Networking
+Symptoms:
+Connection timeout, refused connection, or authentication error.
+
+Troubleshooting:
+Separate the problem into:
+1. DNS resolution
+2. Network route
+3. Firewall/security group
+4. Port reachability
+5. Authentication
+6. Database availability
+7. Connection pool configuration
+
+Solution:
+Fix only the failing layer. Do not expose passwords in tickets or logs.
+
+Validation:
+Perform an approved connectivity test and application health check.
+
+
+KB-DEV-022 — High CPU Usage on Application
+------------------------------------------
+Category: Monitoring / Performance
+Symptoms:
+CPU remains above the defined operational threshold.
+
+Troubleshooting:
+1. Check time range and affected instances.
+2. Identify deployment correlation.
+3. Review application metrics.
+4. Check traffic volume.
+5. Inspect slow operations.
+6. Check for runaway processes.
+
+Solution:
+Depending on evidence, optimize code, reduce unnecessary work, scale out,
+or adjust resource allocation according to capacity policy.
+
+Validation:
+CPU returns to normal range and application latency/error rate is healthy.
+
+
+KB-DEV-023 — Memory Leak / OOMKilled Pod
+----------------------------------------
+Category: Kubernetes / Performance
+Symptoms:
+Pod terminates with OOMKilled.
+
+Troubleshooting:
+   kubectl describe pod <pod> -n sample-app
+Review memory requests/limits and application memory metrics.
+
+Solution:
+Determine whether the issue is:
+- Actual memory leak
+- Increased workload
+- Undersized limit
+- Unbounded cache
+
+Increase limits only as a temporary/validated measure; investigate application
+behavior for persistent OOM events.
+
+Validation:
+Monitor memory over several workload cycles.
+
+
+KB-DEV-024 — Nginx 502 Bad Gateway
+----------------------------------
+Category: Networking / Web Server
+Symptoms:
+Users receive HTTP 502 from Nginx/reverse proxy.
+
+Troubleshooting:
+1. Check Nginx error log.
+2. Verify upstream application is running.
+3. Verify upstream host/port.
+4. Check DNS.
+5. Test upstream directly.
+6. Check timeout configuration.
+
+Solution:
+Restore upstream availability or correct proxy configuration.
+
+Validation:
+Test the application through the proxy and confirm successful HTTP response.
+
+
+KB-DEV-025 — TLS/SSL Certificate Expiry
+---------------------------------------
+Category: Security / Networking
+Symptoms:
+Browser/API client reports certificate expired or invalid.
+
+Troubleshooting:
+Check certificate expiry and the complete certificate chain using approved
+tools. Identify whether the certificate is managed by the load balancer,
+ingress, reverse proxy, or certificate platform.
+
+Solution:
+Renew and deploy the approved certificate. Verify chain and hostname.
+
+Validation:
+Test from an external client and confirm the new expiry date.
+
+Prevention:
+Set certificate-expiry monitoring well before the renewal deadline.
+
+
+KB-DEV-026 — DNS Resolution Failure
+-----------------------------------
+Category: Networking
+Symptoms:
+Application cannot resolve an internal/external hostname.
+
+Troubleshooting:
+Check:
+- DNS record
+- Resolver configuration
+- Network connectivity
+- Search domains
+- TTL/caching
+- Kubernetes CoreDNS status, if applicable
+
+Solution:
+Correct the DNS record or resolver configuration and allow propagation.
+
+Validation:
+Use approved DNS lookup tools and test the application connection.
+
+
+KB-DEV-027 — Deployment Rollback Required
+-----------------------------------------
+Category: Release Management
+Symptoms:
+A new release causes elevated errors, failed health checks, or major
+functional regression.
+
+Troubleshooting:
+1. Confirm correlation with the deployment.
+2. Check error rate and logs.
+3. Identify affected version.
+4. Confirm rollback criteria.
+5. Obtain required approval.
+
+Solution:
+Use the platform's approved rollback mechanism. Example Kubernetes:
+   kubectl rollout undo deployment/sample-app -n sample-app
+
+Validation:
+Confirm previous version is healthy and error rate returns to baseline.
+
+Prevention:
+Use canary/blue-green strategies, automated health checks, and rollback
+procedures.
+
+
+KB-DEV-028 — Terraform Apply Failure
+------------------------------------
+Category: Infrastructure as Code
+Symptoms:
+terraform plan/apply fails.
+
+Troubleshooting:
+   terraform fmt -check
+   terraform validate
+   terraform plan
+
+Check:
+- Provider authentication
+- State locking
+- Resource dependency
+- Variable values
+- Policy restrictions
+- Provider/API errors
+
+Solution:
+Resolve the specific provider/state/configuration error. Never manually
+edit Terraform state unless the documented recovery procedure requires it.
+
+Validation:
+Run plan again and confirm expected changes only.
+
+
+KB-DEV-029 — Terraform State Lock
+---------------------------------
+Category: Infrastructure as Code
+Symptoms:
+Terraform reports that the state is locked.
+
+Troubleshooting:
+Identify the active operation and verify whether another deployment is
+running. Do not force-unlock a state that may still be in use.
+
+Solution:
+If the lock is stale and the organization's approved procedure confirms it,
+use the documented force-unlock process with the exact lock ID.
+
+Validation:
+A new plan/apply completes and state remains consistent.
+
+
+KB-DEV-030 — Monitoring Alert but Application Appears Healthy
+--------------------------------------------------------------
+Category: Monitoring / Observability
+Symptoms:
+Alert fires while application health endpoint appears normal.
+
+Troubleshooting:
+Compare:
+- Alert metric
+- Evaluation window
+- Threshold
+- Aggregation
+- Affected instance/pod
+- Time zone
+- Recent deployments
+
+Solution:
+Correct alert configuration only after confirming the metric and business
+impact. Avoid simply disabling noisy alerts.
+
+Validation:
+Test the alert condition and confirm it reflects the intended failure mode.
+
+Prevention:
+Use actionable thresholds, multi-signal alerts, and documented runbooks.
+
+
+KB-DEV-031 — Log Collection Missing
+-----------------------------------
+Category: Observability / Logging
+Symptoms:
+Expected application logs are absent from centralized logging.
+
+Troubleshooting:
+Check:
+- Application stdout/stderr
+- Log agent/collector status
+- File path
+- Permissions
+- Network connectivity
+- Parser/filter configuration
+- Retention/index limits
+
+Solution:
+Restore the collector path or correct parsing/filter configuration.
+
+Validation:
+Generate a controlled test log and verify it appears in the centralized
+logging platform.
+
+
+KB-DEV-032 — Security Scan Blocks CI Pipeline
+---------------------------------------------
+Category: DevSecOps / Security
+Symptoms:
+SAST, dependency, container, or IaC scan fails the pipeline.
+
+Troubleshooting:
+Identify:
+- Vulnerability ID
+- Severity
+- Affected component
+- Fix version
+- Whether finding is valid or false positive
+- Policy threshold
+
+Solution:
+Upgrade/fix the vulnerable component, remove unnecessary dependency, or
+follow the approved exception process for a verified false positive.
+
+Validation:
+Re-run the scan and confirm the finding is resolved or formally excepted.
+
+
+KB-DEV-033 — Kubernetes RBAC Permission Denied
+----------------------------------------------
+Category: Kubernetes / Security
+Symptoms:
+User/service account receives "forbidden" or "cannot list/get/create".
+
+Troubleshooting:
+   kubectl auth can-i get pods -n sample-app
+   kubectl auth can-i create deployments -n sample-app
+
+Review Role/ClusterRole and RoleBinding/ClusterRoleBinding.
+
+Solution:
+Grant the minimum required permission using least privilege. Avoid
+cluster-admin unless explicitly justified and approved.
+
+Validation:
+Required operation succeeds while unrelated privileged operations remain
+denied.
+
+
+KB-DEV-034 — GitHub/Azure Secret Exposed in Repository
+-------------------------------------------------------
+Category: DevSecOps / Secrets
+Symptoms:
+A credential/token/key is committed to source control.
+
+Immediate Actions:
+1. Treat the credential as compromised.
+2. Revoke/rotate it immediately through the approved secret owner.
+3. Remove it from active code/configuration.
+4. Review access logs where appropriate.
+5. Use secret-management tooling.
+
+Important:
+Removing a secret from the latest commit does not necessarily remove it from
+Git history. Follow the organization's approved history-rewrite procedure.
+
+Prevention:
+Use secret scanning, pre-commit checks, managed secret stores, and short-lived
+credentials.
+
+
+KB-DEV-035 — Production Deployment Failed Due to Missing Environment Variable
+-------------------------------------------------------------------------------
+Category: Deployment / Configuration
+Symptoms:
+Application starts locally but fails in deployment.
+
+Troubleshooting:
+Compare required configuration between environments without exposing secret
+values. Check deployment manifests, variable names, configuration injection,
+and secret references.
+
+Solution:
+Add the missing approved configuration through the correct configuration or
+secret-management process.
+
+Validation:
+Deployment starts, health checks pass, and application logs show no missing
+configuration errors.
+
+
+STANDARD DEVOPS INCIDENT WORKFLOW
+=================================
+
+1. Detect
+   - Alert, ticket, monitoring event, user report, or pipeline failure.
+
+2. Classify
+   - Infrastructure
+   - Application
+   - Network
+   - CI/CD
+   - Kubernetes
+   - Cloud
+   - Security
+   - Observability
+
+3. Assess Impact
+   - Number of users/services affected
+   - Production/non-production
+   - Availability and business impact
+   - Recent changes
+
+4. Troubleshoot
+   - Collect evidence before changing configuration.
+   - Check logs, metrics, events, recent deployments, and dependencies.
+   - Change one relevant variable at a time where possible.
+
+5. Recover
+   - Apply the approved fix or rollback.
+   - Validate health and business functionality.
+
+6. Document
+   - Root cause
+   - Timeline
+   - Actions taken
+   - Validation evidence
+   - Preventive action
+
+7. Close
+   - Confirm with stakeholders.
+   - Update the KB/runbook if the incident exposed a documentation gap.
+
+
+RAG / KB TEST QUESTIONS
+=======================
+
+1. Why is my Kubernetes pod in CrashLoopBackOff?
+2. How do I troubleshoot ImagePullBackOff?
+3. My pod is Pending. What should I check?
+4. Kubernetes Service has no endpoints. What could be wrong?
+5. How do I troubleshoot a readiness probe failure?
+6. Why is my Docker container exiting immediately?
+7. Docker containers cannot communicate with each other. How do I troubleshoot?
+8. Why is my Docker image build failing?
+9. Git push says remote contains work. What should I do?
+10. How do I resolve a Git merge conflict safely?
+11. Azure DevOps pipeline is waiting for an agent. What should I check?
+12. GitHub Actions build is failing only in CI. What should I compare?
+13. Jenkins works differently from my local environment. How can I troubleshoot?
+14. Why is my Azure Container Registry push failing?
+15. Why can't my AWS ECR push complete?
+16. My application cannot connect to the database. What layers should I check?
+17. Nginx is returning 502. What should I investigate?
+18. How do I troubleshoot DNS resolution failure?
+19. Kubernetes pod is OOMKilled. What should I check?
+20. How should I handle an expired TLS certificate?
+21. Terraform apply failed. What checks should I perform?
+22. Terraform says the state is locked. Should I force unlock it?
+23. A monitoring alert fired but the application looks healthy. How do I investigate?
+24. Logs are missing from centralized logging. What should I check?
+25. Security scanning is blocking my pipeline. What is the troubleshooting process?
+26. Kubernetes says forbidden when I run a command. How do I troubleshoot RBAC?
+27. A secret was committed to Git. What should I do immediately?
+28. Application works locally but deployment fails because of configuration.
+29. How do I troubleshoot a failed Kubernetes rollout?
+30. What is the standard DevOps incident troubleshooting workflow?
+
+
+KB SEARCH METADATA
+==================
+
+Suggested metadata fields for a RAG ingestion pipeline:
+
+kb_id
+title
+category
+sub_category
+symptoms
+impact
+causes
+troubleshooting_steps
+solution
+validation
+prevention
+escalation
+commands
+keywords
+severity
+
+Recommended chunking:
+- Chunk by KB article.
+- Preserve KB ID and title in every chunk.
+- Keep troubleshooting and solution sections together.
+- Store metadata separately where supported.
+
+Example metadata:
+{
+  "kb_id": "KB-DEV-008",
+  "category": "Kubernetes",
+  "sub_category": "Pod Troubleshooting",
+  "severity": "High",
+  "keywords": ["CrashLoopBackOff", "pod", "logs", "deployment", "Kubernetes"]
+}
+
+END OF DOCUMENT
