@@ -16,33 +16,51 @@ This application helps teams:
 
 ## Architecture
 
+This application follows a memory-aware Self-RAG architecture for incident support and follow-up troubleshooting. The workflow is designed to understand the user's ongoing operational context, decide whether retrieval is needed, fetch the best internal knowledge, validate relevance, and then generate a final grounded answer.
+
 ```text
-User request
-    ↓
-LangGraph workflow
-    ↓
-Contextualize follow-up question
-    ↓
-Decide whether retrieval is required
-    ↓
-Search private Pinecone knowledge base
-    ↓
-Grade retrieved evidence
-    ┌───────────────┬────────────────────┐
-    │ Relevant      │ Weak / Missing     │
-    ▼               ▼                    
-Generate answer  Rewrite query         
-    │               │                    
-    └───────┬───────┴─────────┐          
-            ▼                 ▼
-      Check support       Web search fallback
-            │                 │
-            └──────┬──────────┘
-                   ▼
-             Final answer
+User Incident / Follow-up
+        ↓
+LangGraph SQLite Memory
+        ↓
+Contextualize Follow-up
+        ↓
+Decide Retrieval
+        ↓
+Private Pinecone Knowledge Base
+        ↓
+Grade Retrieved Documents
+   ┌────┴───────────────┐
+Relevant             Weak / Missing
+   ↓                      ↓
+Generate              Rewrite Query
+   ↓                      ↓
+IsSUP              Retry Private KB
+   ↓                      ↓
+Revise if needed   Internet Search Fallback
+   ↓                      ↓
+IsUSE              Grade Web Evidence
+   ↓                      ↓
+Final Answer ← Generate → IsSUP → IsUSE
+        ↓
+SQLite Checkpoint / Memory
 ```
 
-The workflow emphasizes internal-first retrieval and evidence-based answer generation before using external sources.
+### Step-by-step flow
+
+1. A user submits an incident question or a follow-up question in the UI.
+2. The request enters the LangGraph workflow, where the system loads previous session memory from SQLite.
+3. The app contextualizes the follow-up question using the existing conversation thread.
+4. It decides whether the user query requires retrieval from the private knowledge base.
+5. If needed, the system searches the internal Pinecone vector store for relevant operational documents and runbooks.
+6. The retrieved documents are graded for relevance and usefulness.
+7. If the results are weak or missing, the workflow rewrites the query and retries the private knowledge base search.
+8. If internal evidence is still insufficient, the app performs an internet search fallback.
+9. The retrieved web evidence is also graded before it is used.
+10. The assistant generates the answer and validates it through support and usefulness checks (`IsSUP` and `IsUSE`).
+11. The final answer is returned to the user and saved into the SQLite checkpoint and memory store.
+
+This design ensures that the assistant behaves like a grounded operational partner: it remembers the conversation, searches internal runbooks first, validates evidence, and only falls back to the internet when needed.
 
 ## Tech Stack
 
